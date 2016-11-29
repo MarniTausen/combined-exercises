@@ -9,6 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
 ```
 
 ## Exercises for Object oriented programming
@@ -103,15 +104,23 @@ print.polynomial <- function(x) {
         if(c==0) {
             cat(w)
         } else {
-            cat(" + ")
-            cat(w)
-            cat("x^")
-            cat(c)
+            cat(" + ", w, "x^", c, sep="")
         }
         c <- c+1
     }
     cat("\n")
 }
+
+(poly <- polynomial(2, 3, 5, -6, -2, 7))
+
+x <- -100:100
+qplot(x, evaluate_polynomial(poly, x), geom="line") + theme_bw()
+
+find_root <- function(poly, x, interval){
+    uniroot(evaluate_polynomial, interval, poly=poly)
+}
+
+find_root(poly, x, c(-50, 50))
 
 ```
 

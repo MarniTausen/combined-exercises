@@ -126,13 +126,44 @@ print.polynomial <- function(x) {
         if(c==0) {
             cat(w)
         } else {
-            cat(" + ")
-            cat(w)
-            cat("x^")
-            cat(c)
+            cat(" + ", w, "x^", c, sep="")
         }
         c <- c+1
     }
     cat("\n")
 }
+
+(poly <- polynomial(2, 3, 5, -6, -2, 7))
 ```
+
+    ## 2 + 3x^1 + 5x^2 + -6x^3 + -2x^4 + 7x^5
+
+``` r
+x <- -100:100
+qplot(x, evaluate_polynomial(poly, x), geom="line") + theme_bw()
+```
+
+![](README_files/figure-markdown_github/unnamed-chunk-2-1.png)
+
+``` r
+find_root <- function(poly, x, interval){
+    uniroot(evaluate_polynomial, interval, poly=poly)
+}
+
+find_root(poly, x, c(-50, 50))
+```
+
+    ## $root
+    ## [1] -1.04767
+    ## 
+    ## $f.root
+    ## [1] -0.0001214854
+    ## 
+    ## $iter
+    ## [1] 19
+    ## 
+    ## $init.it
+    ## [1] NA
+    ## 
+    ## $estim.prec
+    ## [1] 6.103516e-05

@@ -1,3 +1,8 @@
+Object oriented programming
+================
+Marni Tausen
+2016-11-29
+
 Exercises for Object oriented programming
 -----------------------------------------
 
@@ -10,8 +15,78 @@ So for our shapes, we want (at least) an interface that gives us two functions: 
 Implement this protocol/interface and the two functions for at least circles and rectangles; by all means, more shapes if you want to.
 
 ``` r
-## Your code and tests here
+circle <- function(radius) structure(list(radius=radius), class="circle")
+square <- function(side) structure(list(side=side), class="square")
+rectangle <- function(x, y) structure(list(x=x, y=y), class="rectangle")
+triangle <- function(l, h) structure(list(l=l, h=h), class="triangle")
+
+circumference <- function(x) UseMethod("circumference")
+circumference.default <- function(x) cat("Not available for object type:", class(x), "\n")
+
+circumference.circle <- function(x) 2*pi*x$radius
+circumference.square <- function(x) x$side*4
+circumference.rectangle<- function(x) x$x*2+x$y*2
+circumference.triangle <- function(x) x$l+x$h+sqrt(x$l^2+x$h^2)
+
+area <- function(x) UseMethod("area")
+area.default <- function(x) cat("Not available for object type:", class(x), "\n")
+
+area.circle <- function(x) x$radius^2*pi
+area.square <- function(x) x$side^2
+area.rectangle <- function(x) x$x*x$y
+area.triangle <- function(x) x$l*x$h*0.5
+
+cir <- circle(12)
+sq <- square(12)
+rec <- rectangle(12, 6)
+tri <- triangle(6, 12)
+
+circumference(cir)
 ```
+
+    ## [1] 75.39822
+
+``` r
+circumference(sq)
+```
+
+    ## [1] 48
+
+``` r
+circumference(rec)
+```
+
+    ## [1] 36
+
+``` r
+circumference(tri)
+```
+
+    ## [1] 31.41641
+
+``` r
+area(cir)
+```
+
+    ## [1] 452.3893
+
+``` r
+area(sq)
+```
+
+    ## [1] 144
+
+``` r
+area(rec)
+```
+
+    ## [1] 72
+
+``` r
+area(tri)
+```
+
+    ## [1] 36
 
 ### Polynomials
 

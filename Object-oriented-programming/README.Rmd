@@ -1,6 +1,6 @@
 ---
 title: "Object oriented programming"
-author: "Your Name"
+author: "Marni Tausen"
 date: "`r Sys.Date()`"
 output:
   md_document:
@@ -20,10 +20,47 @@ Let us imagine that we need to handle some geometric shapes for a program These 
 
 So for our shapes, we want (at least) an interface that gives us two functions: `circumference` and `area`. The default functions, where we have no additional information about an object aside from the fact that it is a shape, are meaningless so should raise an error (check the `stop` function for this), but each specialised shape should implement these two functions.
 
-Implement this protocol/interface and the two functions for at least circles and rectangles; by all means, more shapes if you want to.
+Implement this protocol/interface and the two functions for at least
+circles and rectangles; by all means, more shapes if you want to.
 
 ```{r}
-## Your code and tests here
+
+circle <- function(radius) structure(list(radius=radius), class="circle")
+square <- function(side) structure(list(side=side), class="square")
+rectangle <- function(x, y) structure(list(x=x, y=y), class="rectangle")
+triangle <- function(l, h) structure(list(l=l, h=h), class="triangle")
+
+circumference <- function(x) UseMethod("circumference")
+circumference.default <- function(x) cat("Not available for object type:", class(x), "\n")
+
+circumference.circle <- function(x) 2*pi*x$radius
+circumference.square <- function(x) x$side*4
+circumference.rectangle<- function(x) x$x*2+x$y*2
+circumference.triangle <- function(x) x$l+x$h+sqrt(x$l^2+x$h^2)
+
+area <- function(x) UseMethod("area")
+area.default <- function(x) cat("Not available for object type:", class(x), "\n")
+
+area.circle <- function(x) x$radius^2*pi
+area.square <- function(x) x$side^2
+area.rectangle <- function(x) x$x*x$y
+area.triangle <- function(x) x$l*x$h*0.5
+
+cir <- circle(12)
+sq <- square(12)
+rec <- rectangle(12, 6)
+tri <- triangle(6, 12)
+
+circumference(cir)
+circumference(sq)
+circumference(rec)
+circumference(tri)
+
+area(cir)
+area(sq)
+area(rec)
+area(tri)
+
 ```
 
 ### Polynomials

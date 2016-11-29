@@ -95,5 +95,44 @@ Write a class that lets you represent polynomial objects. An *n*-degree polynomi
 The function `uniroot` (built into R) lets you find the roots of a general function. Use it to write a function that finds the roots of your polynomials. This function works by numerically finding the points where the polynomial is zero. For lines and quadratic polynomials, though, there are analytical solutions. Write special cases for such polynomials such that calling the root finding function on the special cases exploits that solutions are known there.
 
 ``` r
-## Your code and tests here
+polynomial <- function(...){
+    parameters <- list(...)
+    polynomials <- list()
+    for(i in parameters) {
+        if(class(i)!="numeric") {
+            stop("Stop wrong type:", class(i), " Please only use numeric!")
+        }
+        polynomials <- c(polynomials, as.list(i))
+    }
+    structure(polynomials,
+              class="polynomial")
+}
+
+evaluate_polynomial <- function(poly, x) UseMethod("evaluate_polynomial")
+evaluate_polynomial.default <- function(poly, x) stop("No function for this class:", class(poly))
+evaluate_polynomial.polynomial <- function(poly, x){
+    y <- 0
+    c <- 0
+    for(w in poly){
+        y <- y+w*x^c
+        c <- c+1
+    }
+    y
+}
+
+print.polynomial <- function(x) {
+    c <- 0
+    for(w in x){
+        if(c==0) {
+            cat(w)
+        } else {
+            cat(" + ")
+            cat(w)
+            cat("x^")
+            cat(c)
+        }
+        c <- c+1
+    }
+    cat("\n")
+}
 ```

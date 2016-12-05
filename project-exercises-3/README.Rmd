@@ -1,6 +1,6 @@
 ---
 title: "Project exercises 3"
-author: "Your Name"
+author: "Marni Tausen"
 date: "`r Sys.Date()`"
 output:
   md_document:
@@ -29,7 +29,59 @@ blm <- function(model, ...) {
 To get this version of `blm` to work you need to get the prior in a form you can pass along to `update` but if you did the exercises earlier you should already have a function that does this (although you might want to create a class for these distributions and return them as such so you can manipulate them through an interface if you want to take it a bit further).
 
 ```{r}
-# YOUR IMPLEMENTATION HERE
+
+make_prior <- function(model, ...){
+
+    parameters <- list(...)
+    if(!is.null(parameters$alpha)) { alpha <- parameters$alpha }
+    else { alpha <- 1 }
+
+    model <- model.matrix(model)
+    list(mu=vector("numeric", ncol(model)), Sigma=diag(1/alpha, nrow=ncol(model)))
+}
+
+update <- function(model, prior, ...) {
+
+    parameters <- list(...)
+    if(!is.null(parameters$alpha)) { alpha <- parameters$alpha }
+    else { alpha <- 1 }
+    if(!is.null(parameters$beta)) { beta <- parameters$beta }
+    else { beta <- 1 }
+
+    data <- model.frame(model)
+    mx <- model.matrix(model, ...)
+    Sxy <- solve(diag(alpha, nrow=ncol(mx)) + beta * t(mx) %*% mx)
+    mxy <- beta * Sxy %*% t(mx) %*% data$y
+    list(mu=mxy, Sigma=Sxy)
+}
+
+
+blm <- function(model, ...) {
+
+    prior <- make_prior(model, ...)
+    posterior <- update(model, prior, ...)
+
+    obj <- list(coefficients=t(posterior$mu),
+                variances=posterior$Sigma,
+                model=model.frame(model),
+                prior=prior,
+                posterior=posterior,
+                terms=model)
+    class(obj) <- "blm"
+    obj
+}
+
+
+```
+
+```{r}
+
+x <- 1:100
+y <- rnorm(100, x)
+z <- x/y
+
+fit <- blm(y ~ x + z)
+
 ```
 
 ### Model methods
@@ -47,7 +99,9 @@ This function should return fitted parameters of the model. It is not entirely s
 Return the result as a numeric vector with the parameters named. That would fit what you get from `lm`.
 
 ```{r}
-# YOUR IMPLEMENTATION
+coefficients.blm <- function(x) x$coefficients
+
+coefficients(fit)
 ```
 
 #### confint
@@ -109,7 +163,15 @@ For fitted objects, it customarily prints how the fitting function was called an
 If you want to print how the fitting function was called you need to get that from when you fit the object in the `blm` constructor. It is how the constructor was called that is of interest, after all. Inside that function, you can get the way it was called by using the function `sys.call`.
 
 ```{r}
-# YOUR IMPLEMENTATION
+print.blm <- function(x){
+    cat("blm model: "); print(x$terms)
+    cat("\n")
+    cat("Posterior:\n")
+    print(t(x$posterior$mu)); cat("\n")
+    print(x$posterior$Sigma)
+}
+
+fit
 ```
 
 #### residuals

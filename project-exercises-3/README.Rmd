@@ -15,6 +15,34 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Implement a constructor for a `blm` class. One approach, taken from the textbook, is implementing an `update` function and a `blm` function:
 
+```{r, echo=FALSE}
+# Declaring functions in the correct order.
+
+predict.blm <- function(object, ...){
+
+    mxy <- object$posterior$mu
+    Sxy <- object$posterior$Sigma
+
+    formula <- object$terms
+    responseless.formula <- delete.response(terms(formula))
+    frame <- model.frame(responseless.formula, ...)
+    theta_x <- model.matrix(responseless.formula, frame)
+
+    means = vector(length=nrow(theta_x))
+    for(i in seq_along(means)) means[i] <- t(mxy) %*% theta_x[i,]
+    sds = vector(length=nrow(theta_x))
+    for(i in seq_along(sds)) sds[i] <- 1/object$beta + (t(theta_x[i,]) %*% Sxy %*% theta_x[i,])
+    list(mean=means, sd=sds)
+}
+
+fitted.blm <- function(object, ...) predict(object, ...)
+
+deviance.blm <- function(object, ...){
+    (object$model[,1]-fitted(object, ...)$mean)^2
+}
+
+```
+
 
 ```r
 update <- function(model, prior, ...) { ... }
@@ -40,14 +68,7 @@ make_prior <- function(model, ...){
     list(mu=vector("numeric", ncol(model)), Sigma=diag(1/alpha, nrow=ncol(model)))
 }
 
-update <- function(model, prior, ...) {
-
-    parameters <- list(...)
-    if(!is.null(parameters$alpha)) { alpha <- parameters$alpha }
-    else { alpha <- 1 }
-    if(!is.null(parameters$beta)) { beta <- parameters$beta }
-    else { beta <- 1 }
-
+update <- function(model, prior, alpha, beta, ...) {
     data <- model.frame(model)
     mx <- model.matrix(model, ...)
     Sxy <- solve(diag(alpha, nrow=ncol(mx)) + beta * t(mx) %*% mx)
@@ -56,17 +77,19 @@ update <- function(model, prior, ...) {
 }
 
 
-blm <- function(model, ...) {
+blm <- function(model, alpha, beta, ...) {
 
     prior <- make_prior(model, ...)
-    posterior <- update(model, prior, ...)
+    posterior <- update(model, prior, alpha, beta, ...)
 
     obj <- list(coefficients=t(posterior$mu),
                 variances=posterior$Sigma,
                 model=model.frame(model),
                 prior=prior,
                 posterior=posterior,
-                terms=model)
+                terms=model,
+                alpha=alpha,
+                beta=beta)
     class(obj) <- "blm"
     obj
 }
@@ -80,7 +103,7 @@ x <- 1:100
 y <- rnorm(100, x)
 z <- x/y
 
-fit <- blm(y ~ x + z)
+fit <- blm(y ~ x + z, 1, 1)
 
 ```
 
@@ -113,7 +136,13 @@ If our posterior is distributed as $\mathbf{w} \sim N(\mathbf{m},\mathbf{S})$ th
 You take the `level` parameter of the function and get the threshold quantiles by exploiting that a normal distribution is symmetric. So you want the quantiles to be `c(level/2, 1-level/2)`. From that, you can get the thresholds using the function `qnorm`.
 
 ```{r}
-# YOUR IMPLEMENTATION
+#    parm: a specification of which parameters are to be given
+#          confidence intervals, either a vector of numbers or a vector
+#          of names.  If missing, all parameters are considered.
+confint.blm <- function(object, parm, level = 0.95, ...){
+
+    fit <- fitted(object)
+}
 ```
 
 #### deviance
@@ -121,7 +150,13 @@ You take the `level` parameter of the function and get the threshold quantiles b
 This function just computes the sum of squared distances from the predicted response variables to the observed. This should be easy enough to compute if you could get the squared distances, or even if you only had the distances and had to square them yourself. Perhaps there is a function that gives you that?
 
 ```{r}
-# YOUR IMPLEMENTATION
+
+deviance.blm <- function(object, ...){
+    (object$model[,1]-fitted(object, ...)$mean)^2
+}
+
+deviance(fit)
+
 ```
 
 #### fitted
@@ -129,7 +164,11 @@ This function just computes the sum of squared distances from the predicted resp
 This function should give you the fitted response variables. This is *not* the response variables in the data you fitted the model to, but instead the predictions that the model makes.
 
 ```{r}
-# YOUR IMPLEMENTATION
+
+fitted.blm <- function(object, ...) predict(object, ...)
+
+fitted(fit)
+
 ```
 
 #### plot
@@ -151,7 +190,28 @@ predict(object, ...)
 but the convention is that you give it new data in a variable `newdata`. If you do not provide new data, it instead gives you the predictions on the data used to fit the model.
 
 ```{r}
-# YOUR IMPLEMENTATION
+
+predict.blm <- function(object, ...){
+
+    mxy <- object$posterior$mu
+    Sxy <- object$posterior$Sigma
+
+    formula <- object$terms
+    responseless.formula <- delete.response(terms(formula))
+    frame <- model.frame(responseless.formula, ...)
+    theta_x <- model.matrix(responseless.formula, frame)
+
+    means = vector(length=nrow(theta_x))
+    for(i in seq_along(means)) means[i] <- t(mxy) %*% theta_x[i,]
+    sds = vector(length=nrow(theta_x))
+    for(i in seq_along(sds)) sds[i] <- 1/object$beta + (t(theta_x[i,]) %*% Sxy %*% theta_x[i,])
+    list(mean=means, sd=sds)
+}
+
+newdata <- data.frame(x=rnorm(5), z=rnorm(5))
+
+predict(fit, data=newdata)
+
 ```
 
 #### print

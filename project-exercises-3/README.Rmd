@@ -18,7 +18,9 @@ Implement a constructor for a `blm` class. One approach, taken from the textbook
 ```{r, echo=FALSE}
 # Declaring functions in the correct order.
 
-predict.blm <- function(object, ...){
+set.seed(300)
+
+predict.blm <- function(object, variances=FALSE, ...){
 
     mxy <- object$posterior$mu
     Sxy <- object$posterior$Sigma
@@ -29,17 +31,24 @@ predict.blm <- function(object, ...){
     theta_x <- model.matrix(responseless.formula, frame)
 
     means = vector(length=nrow(theta_x))
-    for(i in seq_along(means)) means[i] <- t(mxy) %*% theta_x[i,]
     sds = vector(length=nrow(theta_x))
-    for(i in seq_along(sds)) sds[i] <- 1/object$beta + (t(theta_x[i,]) %*% Sxy %*% theta_x[i,])
-    list(mean=means, sd=sds)
+    for(i in seq_along(means)) {
+        means[i] <- t(mxy) %*% theta_x[i,]
+        sds[i] <- 1/object$beta + (t(theta_x[i,]) %*% Sxy %*% theta_x[i,])
+    }
+
+    if(variances==TRUE) return(list(mean=means, var=sds))
+
+    means
 }
 
-fitted.blm <- function(object, ...) predict(object, ...)
+fitted.blm <- fitted.values.blm <- function(object, ...) predict(object)
 
 deviance.blm <- function(object, ...){
-    (object$model[,1]-fitted(object, ...)$mean)^2
+    object$model[,1]-fitted(object, ...)
 }
+
+terms.blm <- function(x, ...) terms(x$terms)
 
 ```
 
@@ -58,29 +67,24 @@ To get this version of `blm` to work you need to get the prior in a form you can
 
 ```{r}
 
-make_prior <- function(model, ...){
-
-    parameters <- list(...)
-    if(!is.null(parameters$alpha)) { alpha <- parameters$alpha }
-    else { alpha <- 1 }
-
-    model <- model.matrix(model)
-    list(mu=vector("numeric", ncol(model)), Sigma=diag(1/alpha, nrow=ncol(model)))
+make_prior <- function(model, alpha){
+    n <- ncol(model.matrix(model))
+    list(mu=vector("numeric", length=n), Sigma=diag(1/alpha, nrow=n))
 }
 
-update <- function(model, prior, alpha, beta, ...) {
+update <- function(model, prior, beta, ...) {
     data <- model.frame(model)
     mx <- model.matrix(model, ...)
-    Sxy <- solve(diag(alpha, nrow=ncol(mx)) + beta * t(mx) %*% mx)
-    mxy <- beta * Sxy %*% t(mx) %*% data$y
+    Sxy <- solve(prior$Sigma + beta * t(mx) %*% mx)
+    mxy <- beta * Sxy %*% t(mx) %*% data[,1]
     list(mu=mxy, Sigma=Sxy)
 }
 
 
 blm <- function(model, alpha, beta, ...) {
 
-    prior <- make_prior(model, ...)
-    posterior <- update(model, prior, alpha, beta, ...)
+    prior <- make_prior(model, alpha)
+    posterior <- update(model, prior, beta, ...)
 
     obj <- list(coefficients=t(posterior$mu),
                 variances=posterior$Sigma,
@@ -99,8 +103,8 @@ blm <- function(model, alpha, beta, ...) {
 
 ```{r}
 
-x <- 1:100
-y <- rnorm(100, x)
+x <- rnorm(40)
+y <- rnorm(40, x)
 z <- x/y
 
 fit <- blm(y ~ x + z, 1, 1)
@@ -122,9 +126,16 @@ This function should return fitted parameters of the model. It is not entirely s
 Return the result as a numeric vector with the parameters named. That would fit what you get from `lm`.
 
 ```{r}
-coefficients.blm <- function(x) x$coefficients
+
+coefficients.blm <- coef.blm <- function(x){
+    n <- colnames(x$coefficients)
+    coefs <- as.vector(x$coefficients)
+    names(coefs) <- n
+    coefs
+}
 
 coefficients(fit)
+
 ```
 
 #### confint
@@ -139,10 +150,50 @@ You take the `level` parameter of the function and get the threshold quantiles b
 #    parm: a specification of which parameters are to be given
 #          confidence intervals, either a vector of numbers or a vector
 #          of names.  If missing, all parameters are considered.
+#    extra parm feature, if the parm is the response, it gives confidence
+#    intervals on the data, and if new data is given, it gives confidence
+#    intervals on the newly predicted data.
 confint.blm <- function(object, parm, level = 0.95, ...){
 
-    fit <- fitted(object)
+    response = names(object$model)[1]
+
+    if(level<0.5){
+        a <- c(level/2, 1-level/2)
+    } else {
+        a <- c((1-level)/2, 1-(1-level)/2)
+    }
+
+    variables = names(coefficients(object))
+    if(missing(parm)) parm = variables
+    if(parm[1]==response){
+        if(is.null(list(...)$data)){
+            fit <- predict(object, variances=TRUE)
+            list(lb=qnorm(a[1], fit$mean, fit$var),
+                 ub=qnorm(a[2], fit$mean, fit$var))
+        } else {
+            fit <- predict(object, variances=TRUE, ...)
+            list(lb=qnorm(a[1], fit$mean, fit$var),
+                 ub=qnorm(a[2], fit$mean, fit$var))
+        }
+    } else {
+        m <- matrix(0, nrow=length(parm), ncol=2)
+        colnames(m) <- c(paste(a[1]*100, "%"), paste(a[2]*100, "%"))
+        rownames(m) <- parm
+
+        for(i in parm){
+            m[i, 1] <- qnorm(a[1], mean=object$posterior$mu[i,1],
+                             sd=sqrt(object$posterior$Sigma[i,i]))
+            m[i, 2] <- qnorm(a[2], mean=object$posterior$mu[i,1],
+                             sd=sqrt(object$posterior$Sigma[i,i]))
+        }
+
+        m
+    }
 }
+
+confint(fit)
+
+confint(fit, "y")
 ```
 
 #### deviance
@@ -152,11 +203,10 @@ This function just computes the sum of squared distances from the predicted resp
 ```{r}
 
 deviance.blm <- function(object, ...){
-    (object$model[,1]-fitted(object, ...)$mean)^2
+    object$model[,1]-fitted(object, ...)
 }
 
 deviance(fit)
-
 ```
 
 #### fitted
@@ -165,7 +215,7 @@ This function should give you the fitted response variables. This is *not* the r
 
 ```{r}
 
-fitted.blm <- function(object, ...) predict(object, ...)
+fitted.blm <- fitted.values.blm <- function(object, ...) predict(object)
 
 fitted(fit)
 
@@ -176,7 +226,54 @@ fitted(fit)
 This function plots your model. You are pretty free to decide how you want to plot it, but I could imagine that it would be useful to see an x-y plot with a line going through it for the fit. If there are more than one predictor variable, though, I am not sure what would be a good way to visualise the fitted model. There are no explicit rules for what the `plot` function should do, except for plotting something so you can use your imagination.
 
 ```{r}
-# YOUR IMPLEMENTATION
+
+plot.blm <- function(x, ...){
+    if(is.null(list(...)$ggplot)) { ggplot = TRUE } else { ggplot = list(...)$ggplot }
+    if(requireNamespace("ggplot2", quietly = TRUE) && ggplot==TRUE) {
+        data = x$model
+        variables = colnames(x$model)
+
+        c = Inf
+        regression_data = list()
+
+        for(var in variables[-1]){
+            if(c==Inf){
+                min <- min(data[,var]); max = max(data[,var])
+                sequence <- seq(min, max, by=0.01)
+                c <- length(sequence)
+                regression_data <- c(regression_data, list(sequence))
+            } else {
+                min <- min(data[,var]); max = max(data[,var])
+                sequence <- seq(min, max, by=(max-min)/c)
+                regression_data <- c(regression_data, list(sequence[1:c]))
+            }
+        }
+
+        regression_data = data.frame(regression_data)
+        colnames(regression_data) = variables[-1]
+
+        prediction <- predict(x, data=regression_data)
+        cfi <- confint(x, variables[1], data=regression_data)
+
+        figure <- ggplot2::qplot(data[,2], data[,1]) + ggplot2::theme_bw()
+        figure <- figure + ggplot2::labs(x=variables[2], y=variables[1], title="Blm fit")
+        figure <- figure + ggplot2::geom_line(ggplot2::aes(x=regression_data[,1],
+                                                           y=prediction),
+                                              )
+        figure <- figure + ggplot2::geom_line(ggplot2::aes(x=regression_data[,1],
+                                                           y=cfi$lb),
+                                              linetype=2, color="cadetblue4")
+        figure <- figure + ggplot2::geom_line(ggplot2::aes(x=regression_data[,1],
+                                                           y=cfi$ub),
+                                              linetype=2, color="cadetblue4")
+        figure
+    } else {
+
+    }
+}
+
+plot(fit)
+
 ```
 
 #### predict
@@ -191,7 +288,7 @@ but the convention is that you give it new data in a variable `newdata`. If you 
 
 ```{r}
 
-predict.blm <- function(object, ...){
+predict.blm <- function(object, variances=FALSE, ...){
 
     mxy <- object$posterior$mu
     Sxy <- object$posterior$Sigma
@@ -202,10 +299,15 @@ predict.blm <- function(object, ...){
     theta_x <- model.matrix(responseless.formula, frame)
 
     means = vector(length=nrow(theta_x))
-    for(i in seq_along(means)) means[i] <- t(mxy) %*% theta_x[i,]
     sds = vector(length=nrow(theta_x))
-    for(i in seq_along(sds)) sds[i] <- 1/object$beta + (t(theta_x[i,]) %*% Sxy %*% theta_x[i,])
-    list(mean=means, sd=sds)
+    for(i in seq_along(means)) {
+        means[i] <- t(mxy) %*% theta_x[i,]
+        sds[i] <- 1/object$beta + (t(theta_x[i,]) %*% Sxy %*% theta_x[i,])
+    }
+
+    if(variances==TRUE) return(list(mean=means, var=sds))
+
+    means
 }
 
 newdata <- data.frame(x=rnorm(5), z=rnorm(5))
@@ -239,7 +341,11 @@ fit
 This function returns the residuals of the fit. That is the difference between predicted values and observed values for the response variable.
 
 ```{r}
-# YOUR IMPLEMENTATION
+
+residuals.blm <- function(object, ...) (object$model[,1]-predict(object, ...))^2
+
+residuals(fit)
+
 ```
 
 #### summary

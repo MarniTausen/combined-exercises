@@ -1,7 +1,7 @@
 Project exercises 3
 ================
 Marni Tausen
-2016-12-07
+2016-12-08
 
 Class project: Bayesian linear regresssion
 ------------------------------------------
@@ -177,21 +177,12 @@ confint(fit, "y")
 This function just computes the sum of squared distances from the predicted response variables to the observed. This should be easy enough to compute if you could get the squared distances, or even if you only had the distances and had to square them yourself. Perhaps there is a function that gives you that?
 
 ``` r
-deviance.blm <- function(object, ...){
-    object$model[,1]-fitted(object, ...)
-}
+deviance.blm <- function(object, ...) sum((object$model[,1]-fitted(object, ...))^2)
 
 deviance(fit)
 ```
 
-    ##  [1]  0.442523524  0.451961828 -0.330892660  0.120905794  1.211181069
-    ##  [6]  0.872028883  0.660242386  0.455305178  0.057155986  0.067850022
-    ## [11]  0.353162174  1.551111877 -1.280235479 -0.045161283 -0.075443736
-    ## [16] -0.988433711 -1.083285398  0.371116207 -0.753498408 -1.115929803
-    ## [21] -0.042902432  2.213863240  0.524449837 -0.611810433  0.906649268
-    ## [26] -0.840015679  1.266053871 -0.819719015 -0.123700488 -0.638008919
-    ## [31] -0.005699217 -2.588056044 -0.680745976 -0.807583589 -0.306225376
-    ## [36]  1.127223139  2.089271543 -0.298984776 -0.565172384 -0.604536133
+    ## [1] 35.77602
 
 #### fitted
 
@@ -258,7 +249,7 @@ plot.blm <- function(x, ...){
                                               linetype=2, color="cadetblue4")
         figure
     } else {
-
+        # Make a normal print version
     }
 }
 
@@ -343,19 +334,19 @@ fit
 This function returns the residuals of the fit. That is the difference between predicted values and observed values for the response variable.
 
 ``` r
-residuals.blm <- function(object, ...) (object$model[,1]-predict(object, ...))^2
+residuals.blm <- function(object, ...) object$model[,1]-predict(object, ...)
 
 residuals(fit)
 ```
 
-    ##  [1] 1.958271e-01 2.042695e-01 1.094900e-01 1.461821e-02 1.466960e+00
-    ##  [6] 7.604344e-01 4.359200e-01 2.073028e-01 3.266807e-03 4.603625e-03
-    ## [11] 1.247235e-01 2.405948e+00 1.639003e+00 2.039541e-03 5.691757e-03
-    ## [16] 9.770012e-01 1.173507e+00 1.377272e-01 5.677599e-01 1.245299e+00
-    ## [21] 1.840619e-03 4.901190e+00 2.750476e-01 3.743120e-01 8.220129e-01
-    ## [26] 7.056263e-01 1.602892e+00 6.719393e-01 1.530181e-02 4.070554e-01
-    ## [31] 3.248107e-05 6.698034e+00 4.634151e-01 6.521913e-01 9.377398e-02
-    ## [36] 1.270632e+00 4.365056e+00 8.939190e-02 3.194198e-01 3.654639e-01
+    ##  [1]  0.442523524  0.451961828 -0.330892660  0.120905794  1.211181069
+    ##  [6]  0.872028883  0.660242386  0.455305178  0.057155986  0.067850022
+    ## [11]  0.353162174  1.551111877 -1.280235479 -0.045161283 -0.075443736
+    ## [16] -0.988433711 -1.083285398  0.371116207 -0.753498408 -1.115929803
+    ## [21] -0.042902432  2.213863240  0.524449837 -0.611810433  0.906649268
+    ## [26] -0.840015679  1.266053871 -0.819719015 -0.123700488 -0.638008919
+    ## [31] -0.005699217 -2.588056044 -0.680745976 -0.807583589 -0.306225376
+    ## [36]  1.127223139  2.089271543 -0.298984776 -0.565172384 -0.604536133
 
 #### summary
 
@@ -364,5 +355,50 @@ This function is usually used as a longer version of print. It gives you more in
 It does more than this, however. It returns an object with summary information. What that actually means is up to the model implementation so do what you like here.
 
 ``` r
-# YOUR IMPLEMENTATION
+summary.blm <- function(object, ...){
+
+    ## run some tests and statistics on the bayesian models
+
+    cf <- confint(object)
+    Rsquared <- 1-sum(residuals(object)^2)/sum((object$model[,1]-mean(object$model[,1]))^2)
+
+    obj <- list(terms=object$terms, confint=cf, coefficients=t(object$coefficients),
+                Rsquared=Rsquared)
+    class(obj) <- "summary.blm"
+    obj
+}
+
+print.summary.blm <- function(x) {
+    cat("blm model: "); print(x$terms)
+    cat("\n")
+
+    cat("Coefficients:\n");
+    ct = x$coefficients
+    colnames(ct) <- c("Mean")
+    print(ct)
+
+    cat("\nConfindence intervals: \n")
+    print(x$confint)
+
+    cat("\nR-squared:", x$Rsquared)
+    cat("\n")
+}
+
+summary(fit)
 ```
+
+    ## blm model: y ~ x + z
+    ## 
+    ## Coefficients:
+    ##                    Mean
+    ## (Intercept)  0.13601489
+    ## x            1.26264238
+    ## z           -0.07764627
+    ## 
+    ## Confindence intervals: 
+    ##                  2.5 %       97.5 %
+    ## (Intercept) -0.1819017  0.453931486
+    ## x            0.8647332  1.660551550
+    ## z           -0.1540842 -0.001208389
+    ## 
+    ## R-squared: 0.5290154
